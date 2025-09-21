@@ -1,35 +1,40 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import "./PDFUpload.css";
 
 const PDFUpload = ({ onUpload }) => {
   const fileInputRef = useRef();
+  const [file, setFile] = useState(null);
+
+  const handleButtonClick = () => {
+    if (!file) {
+      fileInputRef.current.click(); // open file selector
+    } else {
+      onUpload(file); // upload the selected file
+    }
+  };
 
   const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      // You can handle file here if needed
-      onUpload(); // trigger upload action
+    if (e.target.files.length > 0) {
+      setFile(e.target.files[0]);
     }
   };
 
   return (
     <div className="upload-wrapper">
-      <h3>Upload Your PDF</h3>
-
-      {/* Hidden file input */}
+      <h3>
+        {" "}
+        Upload your PDFs and get instant <br />
+        insights, notes, and answers.
+      </h3>
       <input
         type="file"
         accept=".pdf"
         ref={fileInputRef}
+        style={{ display: "none" }}
         onChange={handleFileChange}
       />
-
-      {/* Single button triggers file picker */}
-      <button
-        className="file-button"
-        onClick={() => fileInputRef.current.click()}
-      >
-        Choose & Upload
+      <button className="upload-btn" onClick={handleButtonClick}>
+        {file ? `Upload ${file.name}` : "Choose File"}
       </button>
     </div>
   );

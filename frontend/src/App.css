@@ -6,11 +6,16 @@ html,
   padding: 0;
   height: 100%;
   font-family: "Poppins", sans-serif;
-  background-color: #0d0d0d; /* dark base for liquid background */
+  background-color: #0d0d0d;
   color: #fff;
   overflow-x: hidden;
 }
 
 button {
   font-family: inherit;
+}
+
+/* Make Orb hoverable but allow clicks through */
+.orb-background {
+  pointer-events: none; /* ensures buttons and links remain clickable */
 }

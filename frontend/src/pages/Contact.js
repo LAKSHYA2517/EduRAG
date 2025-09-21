@@ -10,7 +10,7 @@ const teamMembers = [
     github: "https://github.com/abhinav-sharma",
   },
   {
-    name: "Lakshay Asnani",
+    name: "Lakshya Asnani",
     role: "Backend Developer",
     linkedin: "https://www.linkedin.com/in/teammate1",
     github: "https://github.com/teammate1",
@@ -22,7 +22,7 @@ const teamMembers = [
     github: "https://github.com/teammate2",
   },
   {
-    name: "Aryan ",
+    name: "Aryan Chaudhary",
     role: "Backend Developer",
     linkedin: "https://www.linkedin.com/in/teammate2",
     github: "https://github.com/teammate2",
