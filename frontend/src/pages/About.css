@@ -1,0 +1,58 @@
+.about-container {
+  min-height: 100vh;
+  padding: 60px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.05); /* translucent like homepage */
+  backdrop-filter: blur(15px);
+  color: white;
+  text-align: center;
+  font-family: "Poppins", sans-serif;
+}
+
+.about-title {
+  font-size: 3rem;
+  margin-bottom: 20px;
+  font-weight: 700;
+}
+
+.about-description {
+  font-size: 1.2rem;
+  max-width: 700px;
+  margin-bottom: 50px;
+  line-height: 1.6;
+}
+
+.about-cards {
+  display: flex;
+  gap: 30px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.about-card {
+  background: rgba(255, 255, 255, 0.15); /* glass effect */
+  backdrop-filter: blur(10px);
+  border-radius: 25px;
+  padding: 30px 20px;
+  width: 250px;
+  text-align: center;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  cursor: pointer;
+}
+
+.about-card:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+}
+
+.about-card h3 {
+  margin: 20px 0 10px;
+  font-size: 1.4rem;
+}
+
+.about-card p {
+  font-size: 0.95rem;
+  line-height: 1.4;
+}

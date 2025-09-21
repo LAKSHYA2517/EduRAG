@@ -1,0 +1,16 @@
+/* App.css */
+body,
+html,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: "Poppins", sans-serif;
+  background-color: #0d0d0d; /* dark base for liquid background */
+  color: #fff;
+  overflow-x: hidden;
+}
+
+button {
+  font-family: inherit;
+}
