@@ -22,7 +22,8 @@ from typing import List, Dict
 import fitz  # PyMuPDF
 from PIL import Image
 from langchain.retrievers import ContextualCompressionRetriever
-from langchain_community.document_compressors import CrossEncoderReranker
+# ⬇️ MODIFIED: Corrected the import path for the reranker.
+from langchain.retrievers.document_compressors import CrossEncoderReranker
 from langchain_community.cross_encoders import HuggingFaceCrossEncoder
 from langchain.agents import AgentExecutor, create_react_agent
 from langchain.tools import tool
@@ -334,3 +335,103 @@ def initialize_agent_for_file(file_name: str) -> AgentExecutor:
     print(f"✅ Agent initialized successfully for file: {file_name}")
     return agent_executor
 
+
+# In your rag_pipeline.py file
+
+# ... (all your imports, config, classes, etc.) ...
+
+# --- Global State Management ---
+assistant_state = {
+    "agent_executor": None,
+    "all_documents": [], # Will be loaded from disk
+    "vectorstore": None,
+    "chat_histories": {}
+}
+
+# --- Main Functions for FastAPI ---
+
+def initialize_persistent_agent():
+    """
+    Called once at server startup.
+    Loads all existing knowledge from ChromaDB and the documents folder, then builds the agent.
+    """
+    global assistant_state
+    
+    print("--- 🧠 Initializing Persistent Agent from Disk ---")
+    
+    # Load core models
+    embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
+    llm = ChatGoogleGenerativeAI(model=LLM_MODEL, google_api_key=GOOGLE_API_KEY)
+    assistant_state["llm"] = llm
+    
+    # Load the persistent vector store
+    assistant_state["vectorstore"] = Chroma(persist_directory=CHROMA_PERSIST_PATH, embedding_function=embeddings)
+    
+    # Load all documents from the documents folder to power the BM25 retriever (which is in-memory)
+    # NOTE: This assumes documents in DOCS_PATH are the source of truth.
+    # A more advanced system would store this in a database.
+    if os.path.exists(DOCS_PATH):
+        # We need to process these to get Document objects for BM25Retriever
+        all_docs = []
+        for filename in os.listdir(DOCS_PATH):
+            file_path = os.path.join(DOCS_PATH, filename)
+            # This is a simplified loader, you'd use your Smart...Processors here
+            if file_path.endswith(".pdf"):
+                 loader = PyPDFLoader(file_path)
+                 all_docs.extend(loader.load())
+        assistant_state["all_documents"] = all_docs
+    
+    # Create the agent executor and store it in the state
+    _rebuild_agent_executor()
+    print("--- ✅ Persistent Agent Initialized Successfully ---")
+
+
+def add_document_and_rebuild(file_path: str):
+    """
+    Processes a newly uploaded file, ADDS it to the persistent store, and rebuilds the agent.
+    """
+    print(f"--- ➕ Adding new document: {os.path.basename(file_path)} ---")
+    # 1. Use your Smart...Processor classes to get chunks from the file_path
+    # This requires initializing the models again or passing them in.
+    embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
+    llm = assistant_state["llm"]
+    
+    new_chunks = []
+    if file_path.endswith(".pdf"):
+        # Assuming SmartPDFProcessor is defined in this file
+        processor = SmartPDFProcessor(embeddings, llm)
+        new_chunks = processor.process_pdf(file_path)
+
+    # 2. Add the new chunks to the persistent vectorstore
+    if new_chunks:
+        assistant_state["vectorstore"].add_documents(new_chunks)
+        assistant_state["all_documents"].extend(new_chunks)
+        print(f"--- 💾 Added {len(new_chunks)} new chunks to ChromaDB. ---")
+
+    # 3. Rebuild the agent so it knows about the new document
+    _rebuild_agent_executor()
+    return len(new_chunks) if new_chunks else 0
+
+
+def get_agent_response(query: str, session_id: str) -> str:
+    # ... (This function remains the same as before)
+    pass
+
+def _rebuild_agent_executor():
+    """
+    Helper function to create or recreate the agent executor using the current state.
+    """
+    global assistant_state
+    
+    if not assistant_state["all_documents"]:
+        print("⚠️ No documents found. QA tool will be ineffective.")
+        return # Do not build an agent if there's no data
+
+    # This is the core logic from your Cell 6 for creating the retriever, tools, and agent
+    vector_retriever = assistant_state["vectorstore"].as_retriever(search_kwargs={"k": 10})
+    bm25_retriever = BM25Retriever.from_documents(assistant_state["all_documents"], k=10)
+    # ... (rest of your retriever, tools, and agent creation logic) ...
+
+    # Finally, set the agent executor in the state
+    # assistant_state["agent_executor"] = AgentExecutor(...)
+    print("--- 🤖 Agent Executor has been rebuilt with the latest data. ---")
