@@ -1,5 +1,3 @@
-// src/App.js
-import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import Home from "./pages/Home";
@@ -22,9 +20,9 @@ function App() {
             left: 0,
             width: "100%",
             height: "100%",
-            zIndex: 0, // background layer
+            zIndex: 0,
             overflow: "hidden",
-            pointerEvents: "auto", // allow Orb to detect hover
+            pointerEvents: "auto",
           }}
         >
           <Orb

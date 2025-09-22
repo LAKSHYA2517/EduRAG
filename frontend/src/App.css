@@ -15,7 +15,6 @@ button {
   font-family: inherit;
 }
 
-/* Make Orb hoverable but allow clicks through */
 .orb-background {
-  pointer-events: none; /* ensures buttons and links remain clickable */
+  pointer-events: none;
 }

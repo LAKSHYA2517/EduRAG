@@ -3,18 +3,18 @@
   padding: 120px 20px 60px 20px;
   display: flex;
   flex-direction: column;
-  align-items: center; /* ensures everything is horizontally centered */
-  justify-content: flex-start; /* keep content from sticking to top */
+  align-items: center;
+  justify-content: flex-start; 
   background: rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(15px);
   color: white;
   font-family: "Poppins", sans-serif;
-  text-align: center; /* center text */
+  text-align: center; 
 }
 
 .contact-title {
   font-size: 3rem;
-  margin-bottom: 15px; /* reduced margin */
+  margin-bottom: 15px; 
   font-weight: 700;
 }
 
@@ -23,7 +23,7 @@
   max-width: 700px;
   margin-bottom: 40px;
   line-height: 1.6;
-  text-align: center; /* ensure text is centered */
+  text-align: center;
 }
 
 /* Form styling */
@@ -32,14 +32,14 @@
   flex-direction: column;
   gap: 15px;
   width: 100%;
-  max-width: 500px; /* limits form width */
+  max-width: 500px; 
   margin-bottom: 50px;
-  align-items: center; /* center inputs */
+  align-items: center; 
 }
 
 .contact-form input,
 .contact-form textarea {
-  width: 100%; /* full width within max-width */
+  width: 100%;
   padding: 15px 20px;
   border-radius: 25px;
   border: none;
@@ -69,10 +69,10 @@
 
 .team-cards {
   display: flex;
-  flex-direction: row; /* horizontal layout */
-  flex-wrap: wrap; /* wrap to next line on smaller screens */
-  gap: 20px; /* space between cards */
-  justify-content: center; /* center cards horizontally */
+  flex-direction: row;
+  flex-wrap: wrap; 
+  gap: 20px; 
+  justify-content: center; 
   align-items: flex-start;
 }
 
@@ -81,7 +81,7 @@
   backdrop-filter: blur(10px);
   border-radius: 25px;
   padding: 30px 20px;
-  width: 220px; /* fixed width for uniform cards */
+  width: 220px;
   text-align: center;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
