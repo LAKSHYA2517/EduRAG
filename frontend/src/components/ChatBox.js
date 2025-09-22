@@ -1,37 +1,46 @@
-import React, { useState } from "react";
-import "./ChatBox.css";
+// components/ChatBox.js
+import React from 'react';
+import './ChatBox.css';
 
-const ChatBox = ({ fullScreen }) => {
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
-
-  const handleSend = () => {
-    if (!input) return;
-    setMessages([...messages, { text: input, sender: "user" }]);
-    setInput("");
+// ✅ The component now receives all its data and functions as props
+const ChatBox = ({
+  messages,
+  input,
+  setInput,
+  handleSend,
+  isLoading,
+}) => {
+  const handleFormSubmit = (e) => {
+    e.preventDefault(); // Prevent page reload
+    handleSend();
   };
 
   return (
-    <div className={`chatbox ${fullScreen ? "fullscreen" : ""}`}>
+    <div className="chatbox">
       <div className="chatbox-messages">
+        {/* It now maps over the 'messages' prop */}
         {messages.map((msg, index) => (
           <div
             key={index}
-            className={`chat-message ${msg.sender === "user" ? "user" : "bot"}`}
+            className={`chat-message ${msg.type === 'user' ? 'user' : 'bot'}`} // Assuming type is 'user' or 'bot'
           >
-            {msg.text}
+            <strong>{msg.type === 'user' ? 'You' : 'Bot'}:</strong> {msg.text}
           </div>
         ))}
       </div>
-      <div className="chatbox-input">
+      {/* The input area is now a form */}
+      <form className="chatbox-input" onSubmit={handleFormSubmit}>
         <input
           type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
+          value={input} // Value comes from props
+          onChange={(e) => setInput(e.target.value)} // The function to change the value comes from props
           placeholder="Type your message..."
+          disabled={isLoading}
         />
-        <button onClick={handleSend}>Send</button>
-      </div>
+        <button type="submit" disabled={isLoading}>
+          {isLoading ? 'Thinking...' : 'Send'}
+        </button>
+      </form>
     </div>
   );
 };
