@@ -1,5 +1,6 @@
 import React from "react";
 import "./About.css";
+import Tilt from "react-parallax-tilt";
 
 const About = () => {
   return (
@@ -12,29 +13,35 @@ const About = () => {
       </p>
 
       <div className="about-cards">
-        <div className="about-card">
-          <h3>Learn Smarter</h3>
-          <p>
-            Get AI-assisted insights from your study materials to maximize
-            learning efficiency.
-          </p>
-        </div>
+        <Tilt glareEnable={true} glareMaxOpacity={0.3} scale={1.05}>
+          <div className="about-card">
+            <h3>Learn Smarter</h3>
+            <p>
+              Get AI-assisted insights from your study materials to maximize
+              learning efficiency.
+            </p>
+          </div>
+        </Tilt>
 
-        <div className="about-card">
-          <h3>Tech-Enabled</h3>
-          <p>
-            Seamlessly upload PDFs and access interactive tools designed for
-            modern students.
-          </p>
-        </div>
+        <Tilt glareEnable={true} glareMaxOpacity={0.3} scale={1.05}>
+          <div className="about-card">
+            <h3>Tech-Enabled</h3>
+            <p>
+              Seamlessly upload PDFs and access interactive tools designed for
+              modern students.
+            </p>
+          </div>
+        </Tilt>
 
-        <div className="about-card">
-          <h3>Collaborate</h3>
-          <p>
-            Share insights and work together with peers using our AI-powered
-            features.
-          </p>
-        </div>
+        <Tilt glareEnable={true} glareMaxOpacity={0.3} scale={1.05}>
+          <div className="about-card">
+            <h3>Collaborate</h3>
+            <p>
+              Share insights and work together with peers using our AI-powered
+              features.
+            </p>
+          </div>
+        </Tilt>
       </div>
     </div>
   );
