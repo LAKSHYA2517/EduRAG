@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import PDFUpload from "../components/PDFUpload";
+import PDFUpload from "../components/DocumentUpload";
 import ChatBox from "../components/ChatBox";
 import "./Home.css";
 
