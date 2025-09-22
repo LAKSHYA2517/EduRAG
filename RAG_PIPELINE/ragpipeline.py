@@ -1,4 +1,6 @@
-# --- Cell 1: Imports and Environment Setup ---
+# --- Core RAG Pipeline Logic ---
+# This file contains the refactored, importable logic from your original script.
+
 import os
 import re
 import base64
@@ -20,39 +22,32 @@ from typing import List, Dict
 import fitz  # PyMuPDF
 from PIL import Image
 from langchain.retrievers import ContextualCompressionRetriever
-# ⬇️ MODIFIED: The reranker class now needs its specific import
-from langchain.retrievers.document_compressors import CrossEncoderReranker
+from langchain_community.document_compressors import CrossEncoderReranker
+from langchain_community.cross_encoders import HuggingFaceCrossEncoder
 from langchain.agents import AgentExecutor, create_react_agent
 from langchain.tools import tool
 from langchain import hub
 from langchain_experimental.tools import PythonREPLTool
-from langchain_community.cross_encoders import HuggingFaceCrossEncoder
 
-
-
-
-os.makedirs('./documents', exist_ok=True)
-
-
-# Load environment variables from .env file
-load_dotenv()
-
-
-# --- Cell 2: Configuration ---
+# --- Configuration ---
+# These settings will be used by the functions in this module
 DOCS_PATH = "./documents"
 CHROMA_PERSIST_PATH = "./chroma_db"
-# ⬇️ MODIFIED: This variable now MANDATES a single file to be processed.
-# The script will raise an error if this is empty or the file is not found.
-PROCESS_SPECIFIC_FILE = "DataStructures.pdf" # Example: "DataStructures.pdf"
-
 EMBEDDING_MODEL = 'BAAI/bge-base-en-v1.5'
 CROSS_ENCODER_MODEL = 'cross-encoder/ms-marco-MiniLM-L-12-v2'
 LLM_MODEL = "gemini-1.5-flash-latest" 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
+# --- Global Variables for Agent Components ---
+# These are defined globally so the tools can access them after initialization
+progress_tracker: Dict[str, str] = {}
+llm = None
+retriever = None
+all_documents_for_tools = []
+python_repl_tool = None
+rag_chain_for_tools = None
 
-# --- Cell 3: Helper Functions (Document Processors & Vector Store Setup) ---
-
+# --- Helper Functions and Classes (Document Processors) ---
 def get_image_summary(image_bytes: bytes, llm: ChatGoogleGenerativeAI) -> str:
     """Generates a summary for an image using a multi-modal LLM."""
     print("Generating image summary...")
@@ -82,7 +77,7 @@ class SmartPDFProcessor:
             loader = PyPDFLoader(pdf_path)
             pages = loader.load()
             
-            full_text = "\n\n".join([self._clean_text(page.page_content) for page in pages])
+            full_text = "\n\n".join([re.sub(r'\s+', ' ', page.page_content).strip().replace("ﬁ", "fi").replace("ﬂ", "fl") for page in pages])
             chunks = self.text_splitter.create_documents([full_text])
             for chunk in chunks: chunk.metadata['source'] = pdf_path
             all_docs.extend(chunks)
@@ -98,7 +93,6 @@ class SmartPDFProcessor:
             return all_docs
         except Exception as e:
             print(f"❌ Error processing {pdf_path}: {e}"); return []
-    def _clean_text(self, text: str) -> str: return re.sub(r'\s+', ' ', text).strip().replace("ﬁ", "fi").replace("ﬂ", "fl")
 
 class SmartDocProcessor:
     def __init__(self, embeddings): self.text_splitter = SemanticChunker(embeddings)
@@ -109,14 +103,13 @@ class SmartDocProcessor:
             elif doc_path.lower().endswith(".txt"): loader = TextLoader(doc_path, encoding='utf-8')
             else: return []
             documents = loader.load()
-            full_text = "\n\n".join([self._clean_text(doc.page_content) for doc in documents if len(self._clean_text(doc.page_content).strip()) >= 50])
+            full_text = "\n\n".join([re.sub(r'\s+', ' ', doc.page_content).strip() for doc in documents if len(re.sub(r'\s+', ' ', doc.page_content).strip()) >= 50])
             if not full_text: return []
             splits = self.text_splitter.create_documents([full_text])
             for split in splits: split.metadata.update({ "source": doc_path, "chunk_method": "semantic_chunker_text", "char_count": len(split.page_content)})
             print(f"✅ Successfully processed {len(splits)} chunks from {doc_path}")
             return splits
         except Exception as e: print(f"❌ Error processing {doc_path}: {e}"); return []
-    def _clean_text(self, text: str) -> str: return re.sub(r'\s+', ' ', text).strip()
 
 class SmartLatexProcessor:
     def __init__(self, embeddings): self.text_splitter = SemanticChunker(embeddings)
@@ -153,25 +146,15 @@ class SmartPPTProcessor:
         try: loader = UnstructuredPowerPointLoader(ppt_path, mode="elements"); return loader.load()
         except Exception as e: print(f"❌ Error processing {ppt_path}: {e}"); return []
 
-# ⬇️ MODIFIED: This function is now simplified to only process one specified file.
-def process_single_file(embedding_function, llm_for_summaries) -> List[Document]:
+def process_single_file(file_path: str, embedding_function, llm_for_summaries) -> List[Document]:
     """
-    Processes a single file specified by the PROCESS_SPECIFIC_FILE variable.
+    Processes a single file from the given path.
     """
-    if not PROCESS_SPECIFIC_FILE:
-        raise ValueError("The 'PROCESS_SPECIFIC_FILE' variable is not set. Please specify a filename in Cell 2.")
-
-    specific_file_path = os.path.join(DOCS_PATH, PROCESS_SPECIFIC_FILE)
-    
-    if not os.path.exists(specific_file_path):
-        raise FileNotFoundError(f"The specified file '{PROCESS_SPECIFIC_FILE}' was not found in the '{DOCS_PATH}' directory.")
-
-    print(f"--- 🎯 Processing specific file: {PROCESS_SPECIFIC_FILE} ---")
-    
+    print(f"--- 🎯 Processing specific file: {file_path} ---")
     all_splits, processors = [], {".pdf": SmartPDFProcessor(embeddings=embedding_function, llm=llm_for_summaries), ".txt": SmartDocProcessor(embeddings=embedding_function), ".docx": SmartDocProcessor(embeddings=embedding_function), ".tex": SmartLatexProcessor(embeddings=embedding_function), ".csv": SmartSheetProcessor(), ".xlsx": SmartSheetProcessor(), ".pptx": SmartPPTProcessor(), ".ppt": SmartPPTProcessor()}
     
-    filename = PROCESS_SPECIFIC_FILE
-    file_path, file_ext = os.path.join(DOCS_PATH, filename), os.path.splitext(filename)[1].lower()
+    filename = os.path.basename(file_path)
+    file_ext = os.path.splitext(filename)[1].lower()
     
     if file_ext in processors:
         processor = processors[file_ext]
@@ -181,12 +164,11 @@ def process_single_file(embedding_function, llm_for_summaries) -> List[Document]
         elif hasattr(processor, 'process_sheet'): all_splits.extend(processor.process_sheet(file_path))
         elif hasattr(processor, 'process_ppt'): all_splits.extend(processor.process_ppt(file_path))
     else:
-        print(f"❌ Warning: File type '{file_ext}' for file '{filename}' is not supported.")
+        raise ValueError(f"File type '{file_ext}' for file '{filename}' is not supported.")
 
     return all_splits
 
-
-# --- Cell 4: RAG Chain and Tool Creation ---
+# --- RAG Chain Creation ---
 def create_rag_chain(retriever, llm):
     contextualize_q_prompt = ChatPromptTemplate.from_messages([("system", "Given a chat history and the latest user question which might reference context in the chat history, formulate a standalone question which can be understood without the chat history. Do NOT answer the question, just reformulate it if needed and otherwise return it as is."), MessagesPlaceholder("chat_history"), ("human", "{input}")])
     history_aware_retriever = create_history_aware_retriever(llm, retriever, contextualize_q_prompt)
@@ -195,15 +177,7 @@ def create_rag_chain(retriever, llm):
     question_answer_chain = create_stuff_documents_chain(llm, qa_prompt)
     return create_retrieval_chain(history_aware_retriever, question_answer_chain)
 
-
-# --- Cell 5: Assistant Tools and Features ---
-progress_tracker: Dict[str, str] = {}
-llm = None
-retriever = None
-all_documents_for_tools = []
-python_repl_tool = None
-rag_chain_for_tools = None
-
+# --- Agent Tools ---
 @tool
 def curriculum_qa_tool(input: str, chat_history: List = []):
     """
@@ -308,66 +282,55 @@ def view_study_progress(input: str = ""):
     return progress_report
 
 
-# --- Cell 6: Initialization and Main Execution ---
-print("--- 🚀 AI Curriculum Assistant Initializing (Agent Mode) 🚀 ---")
-if not GOOGLE_API_KEY:
-    print("❌ Error: GOOGLE_API_KEY not found. Please set it in your .env file.")
-else:
-    try:
-        embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
-        llm = ChatGoogleGenerativeAI(model=LLM_MODEL, google_api_key=GOOGLE_API_KEY, temperature=0.5)
-        
-        # ⬇️ MODIFIED: Function call updated to the new single-file processor.
-        all_documents_for_tools = process_single_file(embeddings, llm)
-        if not all_documents_for_tools: raise ValueError("No documents were processed. Halting initialization.")
-
-        if os.path.exists(CHROMA_PERSIST_PATH) and os.listdir(CHROMA_PERSIST_PATH):
-            print(f"✅ Loading existing vector store from '{CHROMA_PERSIST_PATH}'...")
-            vectorstore = Chroma(persist_directory=CHROMA_PERSIST_PATH, embedding_function=embeddings)
-        else:
-            print(f"⚠️ No existing vector store found. Creating and persisting a new one at '{CHROMA_PERSIST_PATH}'...")
-            vectorstore = Chroma.from_documents(documents=all_documents_for_tools, embedding=embeddings, persist_directory=CHROMA_PERSIST_PATH)
-        
-        vector_retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 10})
-        bm25_retriever = BM25Retriever.from_documents(all_documents_for_tools, k=10)
-        ensemble_retriever = EnsembleRetriever(retrievers=[bm25_retriever, vector_retriever], weights=[0.5, 0.5])
-        
-        print(f"Initializing cross-encoder for reranking: '{CROSS_ENCODER_MODEL}'")
-        model = HuggingFaceCrossEncoder(model_name=CROSS_ENCODER_MODEL)
-        compressor = CrossEncoderReranker(model=model, top_n=3)
-        retriever = ContextualCompressionRetriever(base_compressor=compressor, base_retriever=ensemble_retriever)
-        
-        rag_chain_for_tools = create_rag_chain(retriever, llm)
-        python_repl_tool = PythonREPLTool()
-        
-        tools = [curriculum_qa_tool, python_math_solver, enhanced_quiz_generator, learning_path_suggester, mark_topic_as_studied, view_study_progress]
-        
-        agent_prompt = hub.pull("hwchase17/react-chat")
-        agent = create_react_agent(llm, tools, agent_prompt)
-        agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True, handle_parsing_errors=True)
-        
-        chat_history = []
-        print("\n✅ Multi-tool Assistant is ready! Ask me a curriculum question or give me a math problem to solve.")
-        
-    except (ValueError, FileNotFoundError) as e: print(f"❌ Error: {e}")
-    except Exception as e: print(f"❌ An unexpected error occurred during initialization: {e}")
-
-
-    #Cell 7: Interactive Chat Loop ---
-if 'agent_executor' in locals():
-    user_input = "Give C Code for Bubble Sort"
+# --- Main Initialization Function ---
+def initialize_agent_for_file(file_name: str) -> AgentExecutor:
+    """
+    This is the master function. It takes a filename, runs the entire pipeline,
+    and returns a ready-to-use agent executor.
+    """
+    global llm, retriever, all_documents_for_tools, python_repl_tool, rag_chain_for_tools
     
-    response = agent_executor.invoke({
-        "input": user_input,
-        "chat_history": chat_history
-    })
+    load_dotenv()
     
-    answer = response["output"]
-    print(f"🤖 Assistant: {answer}")
+    # Initialize core components
+    if not GOOGLE_API_KEY:
+        raise ValueError("GOOGLE_API_KEY not found in .env file.")
+    embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
+    llm = ChatGoogleGenerativeAI(model=LLM_MODEL, google_api_key=GOOGLE_API_KEY, temperature=0.5)
     
-    chat_history.extend([
-        HumanMessage(content=user_input),
-        AIMessage(content=answer),
-    ])
-else:
-    print("The Agent Executor is not initialized. Please run the setup cells successfully.")
+    # Process the specified file
+    full_file_path = os.path.join(DOCS_PATH, file_name)
+    all_documents_for_tools = process_single_file(full_file_path, embeddings, llm)
+    if not all_documents_for_tools:
+        raise ValueError(f"Failed to extract any content from {file_name}.")
+
+    # Create a fresh vector store for this file/session
+    if os.path.exists(CHROMA_PERSIST_PATH):
+        import shutil
+        shutil.rmtree(CHROMA_PERSIST_PATH)
+        
+    vectorstore = Chroma.from_documents(documents=all_documents_for_tools, embedding=embeddings, persist_directory=CHROMA_PERSIST_PATH)
+    
+    # Setup the complete retriever
+    vector_retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 10})
+    bm25_retriever = BM25Retriever.from_documents(all_documents_for_tools, k=10)
+    ensemble_retriever = EnsembleRetriever(retrievers=[bm25_retriever, vector_retriever], weights=[0.5, 0.5])
+    
+    model = HuggingFaceCrossEncoder(model_name=CROSS_ENCODER_MODEL)
+    compressor = CrossEncoderReranker(model=model, top_n=3)
+    retriever = ContextualCompressionRetriever(base_compressor=compressor, base_retriever=ensemble_retriever)
+    
+    # Create the RAG chain and tools
+    rag_chain_for_tools = create_rag_chain(retriever, llm)
+    python_repl_tool = PythonREPLTool()
+    
+    tools = [curriculum_qa_tool, python_math_solver, enhanced_quiz_generator, learning_path_suggester, mark_topic_as_studied, view_study_progress]
+    
+    # Create and return the agent executor
+    agent_prompt = hub.pull("hwchase17/react-chat")
+    agent = create_react_agent(llm, tools, agent_prompt)
+    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True, handle_parsing_errors=True)
+    
+    print(f"✅ Agent initialized successfully for file: {file_name}")
+    return agent_executor
+
