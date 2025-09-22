@@ -7,10 +7,12 @@ import About from "./pages/About";
 import Contact from "./pages/Contact";
 import Login from "./pages/Login";
 import Orb from "./components/Orb";
+import SplashCursor from "./components/ui/SplashCursor";
 
 function App() {
   return (
     <Router>
+      <SplashCursor />
       <div style={{ position: "relative", minHeight: "100vh" }}>
         {/* Orb background */}
         <div
